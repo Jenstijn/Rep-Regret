@@ -4,6 +4,8 @@ import react from '@vitejs/plugin-react'
 
 export default defineConfig({
   plugins: [react()],
-  // Let op: EXACT de repo-naam (hoofdletters en streepje)
+  // EXACT jouw repo-pad (hoofdletters tellen) voor GitHub Pages:
   base: '/Rep-Regret/',
+  // Laat Vite naar 'docs/' bouwen i.p.v. 'dist/'
+  build: { outDir: 'docs' }
 })
