@@ -3,15 +3,25 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <!-- Relatieve manifest-link (werkt ook onder /Rep-Regret/) -->
     <link rel="manifest" href="/Rep-Regret/assets/manifest-2Kzzwqze.webmanifest">
     <meta name="theme-color" content="#111111">
     <title>Rep & Regret</title>
+    <!-- Zet de door 404.html bewaarde route terug vóórdat de app laadt -->
+    <script>
+      (function () {
+        var r = sessionStorage.redirect
+        if (r) {
+          try { sessionStorage.removeItem('redirect') } catch {}
+          if (r !== '/' && r !== '/index.html') {
+            history.replaceState(null, null, r)
+          }
+        }
+      })();
+    </script>
     <script type="module" crossorigin src="/Rep-Regret/assets/index-59KWog0u.js"></script>
     <link rel="stylesheet" crossorigin href="/Rep-Regret/assets/index-Bv45i7W7.css">
   </head>
   <body>
     <div id="root"></div>
-    <!-- Vite dev-entry blijft zo; in build herschrijft Vite paden o.b.v. base -->
   </body>
 </html>

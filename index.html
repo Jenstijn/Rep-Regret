@@ -3,14 +3,24 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <!-- Relatieve manifest-link (werkt ook onder /Rep-Regret/) -->
     <link rel="manifest" href="manifest.webmanifest">
     <meta name="theme-color" content="#111111">
     <title>Rep & Regret</title>
+    <!-- Zet de door 404.html bewaarde route terug vóórdat de app laadt -->
+    <script>
+      (function () {
+        var r = sessionStorage.redirect
+        if (r) {
+          try { sessionStorage.removeItem('redirect') } catch {}
+          if (r !== '/' && r !== '/index.html') {
+            history.replaceState(null, null, r)
+          }
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>
-    <!-- Vite dev-entry blijft zo; in build herschrijft Vite paden o.b.v. base -->
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
