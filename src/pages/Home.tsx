@@ -1,16 +1,14 @@
-//src/pages/Home.tsx
 import React, { useMemo } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../lib/db'
-import type { WorkoutTemplate, Session } from '../types'
+import type { WorkoutTemplate } from '../types'
 
 const DAYS = ['', 'Ma','Di','Wo','Do','Vr','Za','Zo']
 
 export default function Home() {
   const navigate = useNavigate()
 
-  // Live data
   const templates = useLiveQuery(() => db.workout_templates.toArray(), [], [])
   const sessions = useLiveQuery(() => db.sessions.orderBy('startedAt').reverse().toArray(), [], [])
 
@@ -19,7 +17,6 @@ export default function Home() {
   const next = useMemo(() => {
     if (!templates?.length) return null
     const today = getTodayDow()
-    // kies template met minste dagen tot volgende occurrence
     const withDelta = templates.map(t => ({ t, delta: ((t.dayOfWeek - today + 7) % 7) }))
     withDelta.sort((a,b) => a.delta - b.delta || a.t.name.localeCompare(b.t.name))
     return withDelta[0].t
@@ -31,7 +28,6 @@ export default function Home() {
     navigate(`/session/${id}`)
   }
 
-  // Map voor naam lookup
   const tById = useMemo(() => {
     const m = new Map<string, WorkoutTemplate>()
     for (const t of (templates ?? [])) m.set(t.id, t)
@@ -44,7 +40,7 @@ export default function Home() {
     <div>
       <h1>Welkom</h1>
 
-      {/* Active session banner */}
+      {/* Actieve sessie (indien bezig) */}
       {activeSession && (
         <div className="card" style={{marginBottom:12, borderColor:'#ddd'}}>
           <div className="row">
@@ -61,7 +57,7 @@ export default function Home() {
         </div>
       )}
 
-      {/* Next workout suggestion */}
+      {/* Volgende workout */}
       <div className="card" style={{marginBottom:12}}>
         <div className="row">
           <div>
@@ -71,24 +67,13 @@ export default function Home() {
             </span>
           </div>
           <div className="actions">
-            {next ? <button onClick={() => startSession(next.id)}>Start</button> : <Link to="/">{'Naar Planner'}</Link>}
+            {next ? <button onClick={() => startSession(next.id)}>Start</button> : <Link to="/planner">{'Naar Planner'}</Link>}
           </div>
         </div>
       </div>
 
-      {/* Quick links */}
+      {/* Recent */}
       <div className="card" style={{marginBottom:12}}>
-        <div className="row" style={{borderBottom:'none', paddingBottom:0}}>
-          <div className="actions">
-            <Link to="/">Planner</Link>
-            <Link to="/progress">Progressie</Link>
-            <Link to="/history">Historie</Link>
-          </div>
-        </div>
-      </div>
-
-      {/* Recent sessions */}
-      <div className="card">
         <div className="row" style={{borderBottom:'none', paddingBottom:0}}>
           <div><strong>Recent</strong></div>
         </div>
@@ -108,17 +93,57 @@ export default function Home() {
         </ul>
       </div>
 
-      <p className="small" style={{marginTop:12}}>
-        Tip: voeg de app toe aan je beginscherm voor een fullscreen ervaring (iPhone Safari: Deel → Zet op beginscherm).
-      </p>
+      {/* Hoe werkt het? (korte uitleg) */}
+      <div className="card">
+        <div className="row" style={{borderBottom:'none', paddingBottom:0}}>
+          <div><strong>Hoe werkt het?</strong></div>
+        </div>
+        <ul className="sublist" style={{marginTop:8}}>
+          <li className="subrow" style={{borderBottom:'none'}}>
+            <div className="grow">
+              <strong>1. Planner</strong>
+              <div className="small">Maak workouts per weekdag en voeg oefeningen toe met standaard sets/reps/gewicht. <Link to="/planner">Ga naar Planner</Link>.</div>
+            </div>
+          </li>
+          <li className="subrow" style={{borderBottom:'none'}}>
+            <div className="grow">
+              <strong>2. Start sessie</strong>
+              <div className="small">Start vanaf Home (Volgende workout) of via de Planner.</div>
+            </div>
+          </li>
+          <li className="subrow" style={{borderBottom:'none'}}>
+            <div className="grow">
+              <strong>3. Log snel</strong>
+              <div className="small">Gebruik ±reps, ±2.5 kg, **Vorige keer** en markeer sets met **✓ Done**. Optioneel: RPE en Warm-up. Timer helpt met rustpauzes.</div>
+            </div>
+          </li>
+          <li className="subrow" style={{borderBottom:'none'}}>
+            <div className="grow">
+              <strong>4. Afronden</strong>
+              <div className="small">Eindig sessie. Alles staat in <Link to="/history">Historie</Link> en is te exporteren als CSV.</div>
+            </div>
+          </li>
+          <li className="subrow" style={{borderBottom:'none'}}>
+            <div className="grow">
+              <strong>5. Progressie</strong>
+              <div className="small">Bekijk grafieken per oefening (Gewicht, Volume, est. 1RM) met filters. <Link to="/progress">Naar Progressie</Link>.</div>
+            </div>
+          </li>
+          <li className="subrow" style={{borderBottom:'none'}}>
+            <div className="grow">
+              <strong>6. PWA & privacy</strong>
+              <div className="small">Voeg toe aan je beginscherm (iPhone: Deel → Zet op beginscherm). Data blijft lokaal in je browser. Backup? Exporteer CSV.</div>
+            </div>
+          </li>
+        </ul>
+      </div>
     </div>
   )
 }
 
 function getTodayDow() {
-  // Map JS getDay (0=Zo) naar onze 1..7 (Ma..Zo)
   const js = new Date().getDay() // 0..6
-  return js === 0 ? 7 : js // 1..7, met Ma=1 … Zo=7
+  return js === 0 ? 7 : js // 1..7 (Ma=1 … Zo=7)
 }
 
 function formatDate(d: Date | string) {
