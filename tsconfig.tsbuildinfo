@@ -1,0 +1,1 @@
+{"root":["./src/App.tsx","./src/main.tsx","./src/types.ts","./src/lib/csv.ts","./src/lib/db.ts","./src/lib/metrics.ts","./src/pages/History.tsx","./src/pages/Planner.tsx","./src/pages/Progress.tsx","./src/pages/Session.tsx"],"version":"5.9.2"}
