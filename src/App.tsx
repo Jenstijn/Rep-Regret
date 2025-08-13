@@ -23,7 +23,7 @@ function Navbar() {
 export default function App() {
   const [ready, setReady] = useState(false)
   useEffect(() => {
-    (async () => {
+    ;(async () => {
       await ensureSeeded()
       await dedupeTemplates()
       setReady(true)
@@ -35,11 +35,16 @@ export default function App() {
     <div className="container">
       <Navbar />
       <Routes>
+        {/* Root en index.html moeten Home tonen */}
         <Route path="/" element={<Home />} />
+        <Route path="/index.html" element={<Home />} />
+        {/* Overige pagina's */}
         <Route path="/planner" element={<Planner />} />
         <Route path="/session/:id" element={<Session />} />
         <Route path="/history" element={<History />} />
         <Route path="/progress" element={<Progress />} />
+        {/* Fallback voor elke onbekende route */}
+        <Route path="*" element={<Home />} />
       </Routes>
     </div>
   )
