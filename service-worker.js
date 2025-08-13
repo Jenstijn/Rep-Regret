@@ -1,5 +1,5 @@
 //service-worker.js
-const CACHE = 'repregret-v2'
+const CACHE = 'repregret-v3'
 const BASE = new URL('.', self.location).href  // eindigt op .../Rep-Regret/
 
 function abs(path) { return new URL(path, BASE).toString() }
