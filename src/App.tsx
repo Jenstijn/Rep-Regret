@@ -1,4 +1,4 @@
-// src/App.tsx
+//src/App.tsx
 import React, { useEffect, useState } from 'react'
 import { Routes, Route, Link } from 'react-router-dom'
 import Home from './pages/Home'
@@ -10,13 +10,11 @@ import { ensureSeeded, dedupeTemplates } from './lib/db'
 import './styles.css'
 
 function Navbar() {
-  const [solid, setSolid] = useState<boolean>(() => {
-    try { return localStorage.getItem('solid') === '1' } catch { return false }
-  })
+  // Zorg dat eventuele oude 'solide' instelling niet meer actief is
   useEffect(() => {
-    document.body.dataset.solid = solid ? '1' : '0'
-    try { localStorage.setItem('solid', solid ? '1' : '0') } catch {}
-  }, [solid])
+    try { delete (document.body as any).dataset.solid } catch {}
+    try { localStorage.removeItem('solid') } catch {}
+  }, [])
 
   return (
     <nav className="nav">
@@ -25,11 +23,6 @@ function Navbar() {
         <Link to="/planner">Planner</Link>
         <Link to="/history">Historie</Link>
         <Link to="/progress">Progressie</Link>
-      </div>
-      <div className="right">
-        <button onClick={() => setSolid(s => !s)} title="Schakel solide/glass">
-          {solid ? '🔳 Solide' : '🪟 Glass'}
-        </button>
       </div>
     </nav>
   )
