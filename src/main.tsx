@@ -1,22 +1,22 @@
 //src/main.tsx
 import React from 'react'
 import ReactDOM from 'react-dom/client'
-import { BrowserRouter } from 'react-router-dom'
+import { HashRouter } from 'react-router-dom'
 import App from './App'
 
 const root = document.getElementById('root')!
 
 ReactDOM.createRoot(root).render(
-  // Laat StrictMode lekker aan; onze seed is hier nu tegen bestand.
   <React.StrictMode>
-    <BrowserRouter>
+    <HashRouter>
       <App />
-    </BrowserRouter>
+    </HashRouter>
   </React.StrictMode>
 )
 
-if ('serviceWorker' in navigator) {
+if ('serviceWorker' in navigator && import.meta.env.PROD) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/service-worker.js').catch(console.error)
+    const swUrl = import.meta.env.BASE_URL + 'service-worker.js'
+    navigator.serviceWorker.register(swUrl).catch(console.error)
   })
 }
