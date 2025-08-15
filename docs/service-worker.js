@@ -1,5 +1,5 @@
 //public/service-worker.js
-const CACHE = 'repregret-v9'; // bump versie
+const CACHE = 'repregret-v10'; // bump versie
 
 const BASE = new URL('.', self.location).href;
 const abs = (p) => new URL(p, BASE).toString();
