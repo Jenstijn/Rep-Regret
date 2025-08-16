@@ -154,3 +154,32 @@ button[disabled]{ opacity:.6; cursor:default; }
 
 /* Done-state hint */
 .set-done { opacity:.65; }
+/* …laat je huidige styles.css staan…
+   Voeg alleen deze icon button-styles ONDERAAN toe (of vervang als je wilt). */
+
+/* ==== Icon button (gear) ==== */
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  text-decoration: none;
+  background: var(--ctl-bg);
+  border: 1px solid var(--ctl-border);
+  color: var(--text);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+.icon-btn:hover { background: color-mix(in oklab, var(--ctl-bg) 70%, white 30%); }
+.icon-btn:active { transform: translateY(1px); }
+/* --- Planner: bullets echt uit, ook in Safari --- */
+.container ul,
+.container ol { 
+  list-style: none !important;
+  padding-left: 0 !important;
+  margin-left: 0 !important;
+}
+.container li { list-style: none !important; }
+.container li::marker { content: "" !important; }
