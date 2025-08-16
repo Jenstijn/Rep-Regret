@@ -183,3 +183,40 @@ button[disabled]{ opacity:.6; cursor:default; }
 }
 .container li { list-style: none !important; }
 .container li::marker { content: "" !important; }
+/* === Gear alignment fix (iPhone PWA) === */
+
+/* Nav: iets meer padding, clip binnen de afgeronde hoeken,
+   en rekening houden met de rechter safe-area op iPhone. */
+.nav{
+  padding: 10px 12px;           /* was 8px 10px */
+  margin-bottom: 16px;
+  overflow: hidden;             /* inhoud blijft binnen de capsule */
+}
+@supports (padding: max(0px)) {
+  .nav{ padding-right: calc(12px + env(safe-area-inset-right)); }
+}
+
+/* Gear: compact, transparant standaard (dus geen los 'pill' effect),
+   pas op hover een subtiel achtergrondje. */
+.icon-btn{
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  line-height: 0;
+  border-radius: 999px;
+  background: transparent;      /* geen eigen pil */
+  border: 0;                    /* geen rand */
+  color: var(--text);
+}
+.icon-btn svg{ width: 18px; height: 18px; }
+
+.icon-btn:hover{
+  background: rgba(0,0,0,0.06);
+  border: 1px solid var(--ctl-border);
+}
+@media (prefers-color-scheme: dark){
+  .icon-btn:hover{ background: rgba(255,255,255,0.08); }
+}
