@@ -220,3 +220,52 @@ button[disabled]{ opacity:.6; cursor:default; }
 @media (prefers-color-scheme: dark){
   .icon-btn:hover{ background: rgba(255,255,255,0.08); }
 }
+/* === Gear altijd zichtbaar + kleine schermen fix === */
+
+/* Links-groep mag horizontaal scrollen als het moet (geen scrollbar tonen) */
+.nav > :first-child{
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.nav > :first-child::-webkit-scrollbar{ display: none; }
+
+/* Reserveer altijd ruimte rechts voor het tandwiel
+   en zet het tandwiel absoluut binnen de nav */
+.nav{
+  justify-content: flex-start; /* i.p.v. space-between */
+  padding-right: calc(12px + 40px); /* 40px = ruimte voor icon-btn */
+  overflow: hidden;
+}
+@supports (padding: max(0px)){
+  .nav{ padding-right: calc(12px + 40px + env(safe-area-inset-right)); }
+}
+
+/* tandwiel rechtsboven, altijd binnen de afgeronde nav */
+.nav .right{
+  position: absolute;
+  right: calc(12px + env(safe-area-inset-right));
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: auto;
+}
+
+/* icon compact/transparent (we hielden dit al, maar nog even expliciet) */
+.icon-btn{
+  width: 30px; height: 30px; padding: 0;
+  border: 0; background: transparent;
+  border-radius: 999px; line-height: 0;
+}
+.icon-btn svg{ width: 18px; height: 18px; }
+.icon-btn:hover{
+  background: rgba(0,0,0,0.06);
+  border: 1px solid var(--ctl-border);
+}
+@media (prefers-color-scheme: dark){
+  .icon-btn:hover{ background: rgba(255,255,255,0.08); }
+}
+
+/* optioneel: op hele smalle schermen net iets compactere link-padding */
+@media (max-width: 380px){
+  .nav a { padding: 6px 8px; }
+}
