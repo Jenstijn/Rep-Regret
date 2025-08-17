@@ -2,11 +2,12 @@
 import React, { useMemo, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../lib/db'
-import type { Exercise, WorkoutTemplate } from '../types'
+import type { Exercise } from '../types'
 import { useNavigate } from 'react-router-dom'
+import { toInputValue, fromInputValue } from '../lib/num'
 
 type WorkoutForm = { name: string; dayOfWeek: number }
-type ExerciseForm = { name: string; defaultSets: number; defaultReps: number; defaultWeight: number }
+type ExerciseForm = { name: string; defaultSets: number | null; defaultReps: number | null; defaultWeight: number | null }
 
 const DAYS = ['', 'Ma', 'Di', 'Wo', 'Do', 'Vr', 'Za', 'Zo']
 
@@ -14,46 +15,65 @@ export default function Planner() {
   const navigate = useNavigate()
   const templates = useLiveQuery(() => db.workout_templates.orderBy('dayOfWeek').toArray(), [], [])
   const allExercises = useLiveQuery(() => db.exercises.orderBy('order').toArray(), [], [])
-  const sessions = useLiveQuery(() => db.sessions.toArray(), [], [])
 
-  const [showAddWorkout, setShowAddWorkout] = useState(false)
-  const [editingWorkoutId, setEditingWorkoutId] = useState<string | null>(null)
-  const [addingExerciseFor, setAddingExerciseFor] = useState<string | null>(null)
-  const [editingExerciseId, setEditingExerciseId] = useState<string | null>(null)
-
+  // mapping: templateId -> exercises[]
   const exercisesByTemplate = useMemo(() => {
     const map = new Map<string, Exercise[]>()
-    ;(allExercises ?? []).forEach(e => {
-      const arr = map.get(e.templateId) ?? []
-      arr.push(e)
-      map.set(e.templateId, arr)
-    })
+    for (const e of allExercises ?? []) {
+      const k = String(e.templateId)
+      if (!map.has(k)) map.set(k, [])
+      map.get(k)!.push(e)
+    }
+    for (const [k, arr] of map) arr.sort((a,b) => (a.order ?? 0) - (b.order ?? 0))
     return map
   }, [allExercises])
 
-  async function startSession(templateId: string) {
-    const id = crypto.randomUUID()
-    await db.sessions.add({ id, templateId, startedAt: new Date(), endedAt: null, notes: '' })
-    navigate(`/session/${id}`)
-  }
+  // UI state
+  const [showAddWorkout, setShowAddWorkout] = useState(false)
+  const [addingExerciseFor, setAddingExerciseFor] = useState<string | null>(null)
+  const [editingWorkoutId, setEditingWorkoutId] = useState<string | null>(null)
+  const [editingExerciseId, setEditingExerciseId] = useState<string | null>(null)
 
-  // ── Workout CRUD ──────────────────────────────────────────────────────────────
-  async function addWorkout(form: WorkoutForm) {
-    const id = crypto.randomUUID()
-    await db.workout_templates.add({ id, name: form.name.trim(), dayOfWeek: form.dayOfWeek })
-    setShowAddWorkout(false)
-  }
-  async function updateWorkout(id: string, form: WorkoutForm) {
-    await db.workout_templates.update(id, { name: form.name.trim(), dayOfWeek: form.dayOfWeek })
-    setEditingWorkoutId(null)
-  }
-  async function deleteWorkout(t: WorkoutTemplate) {
-    const sessCount = await db.sessions.where('templateId').equals(t.id).count()
-    if (sessCount > 0) return alert('Kan niet verwijderen: er bestaan sessies voor deze workout.')
-    // verwijder exercises onder deze template
-    const exIds = await db.exercises.where('templateId').equals(t.id).primaryKeys()
-    if (exIds.length) await db.exercises.bulkDelete(exIds as string[])
-    await db.workout_templates.delete(t.id)
+  // ── Start sessie: nu mét sets seeden ─────────────────────────────────────────
+  async function startSession(templateId: string) {
+    const sessionId = crypto.randomUUID()
+
+    // 1) Sessie aanmaken
+    await db.sessions.add({
+      id: sessionId,
+      templateId,
+      startedAt: new Date(),
+      endedAt: null,
+      notes: '',
+    })
+
+    // 2) Oefeningen voor deze workout ophalen
+    const exs = await db.exercises.where('templateId').equals(templateId).toArray()
+
+    // 3) Sets genereren op basis van defaults
+    const setsToAdd: any[] = []
+    for (const ex of exs) {
+      const count = Number(ex.defaultSets ?? 0) // respecteer 0 = geen sets
+      for (let i = 1; i <= count; i++) {
+        setsToAdd.push({
+          id: crypto.randomUUID(),
+          sessionId,
+          exerciseId: String(ex.id),
+          setNumber: i,
+          reps: Number(ex.defaultReps ?? 0),
+          weight: Number(ex.defaultWeight ?? 0),
+          rpe: null,
+          isWarmup: false,
+          completedAt: undefined, // jouw SetLog.completedAt is Date | undefined
+        })
+      }
+    }
+    if (setsToAdd.length) {
+      await db.sets.bulkAdd(setsToAdd)
+    }
+
+    // 4) Naar de sessie
+    navigate(`/session/${sessionId}`)
   }
 
   // ── Exercise CRUD + reorder ──────────────────────────────────────────────────
@@ -63,9 +83,9 @@ export default function Planner() {
       id: crypto.randomUUID(),
       templateId,
       name: form.name.trim(),
-      defaultSets: form.defaultSets,
-      defaultReps: form.defaultReps,
-      defaultWeight: form.defaultWeight,
+      defaultSets: Number(form.defaultSets ?? 0),
+      defaultReps: Number(form.defaultReps ?? 0),
+      defaultWeight: Number(form.defaultWeight ?? 0),
       order
     })
     setAddingExerciseFor(null)
@@ -74,32 +94,57 @@ export default function Planner() {
   async function updateExercise(exId: string, form: ExerciseForm) {
     await db.exercises.update(exId, {
       name: form.name.trim(),
-      defaultSets: form.defaultSets,
-      defaultReps: form.defaultReps,
-      defaultWeight: form.defaultWeight
+      defaultSets: Number(form.defaultSets ?? 0),
+      defaultReps: Number(form.defaultReps ?? 0),
+      defaultWeight: Number(form.defaultWeight ?? 0),
     })
     setEditingExerciseId(null)
   }
 
-  async function deleteExercise(ex: Exercise) {
-    const setCount = await db.sets.where('exerciseId').equals(ex.id).count()
-    if (setCount > 0) return alert('Kan niet verwijderen: er zijn sets gelogd met deze oefening.')
-    await db.exercises.delete(ex.id)
+  async function deleteExercise(id: string) {
+    if (!confirm('Oefening verwijderen?')) return
+    await db.exercises.delete(id)
   }
 
-  async function moveExercise(ex: Exercise, dir: -1 | 1) {
-    const list = (exercisesByTemplate.get(ex.templateId) ?? []).slice().sort((a,b)=>a.order-b.order)
-    const idx = list.findIndex(e => e.id === ex.id)
-    const targetIdx = idx + dir
-    if (targetIdx < 0 || targetIdx >= list.length) return
-    const other = list[targetIdx]
-    // swap orders
-    await db.transaction('rw', db.exercises, async () => {
-      await db.exercises.update(ex.id, { order: other.order })
-      await db.exercises.update(other.id, { order: ex.order })
-    })
+  async function moveExercise(exId: string, dir: -1 | 1) {
+    const ex = (allExercises ?? []).find(e => String(e.id) === String(exId))
+    if (!ex) return
+    const list = (exercisesByTemplate.get(String(ex.templateId)) ?? []).slice()
+    const i = list.findIndex(e => String(e.id) === String(exId))
+    const j = i + dir
+    if (j < 0 || j >= list.length) return
+    const a = list[i], b = list[j]
+    await db.exercises.bulkPut([
+      { ...a, order: (a.order ?? 0) + dir },
+      { ...b, order: (b.order ?? 0) - dir },
+    ])
   }
 
+  // ── Workout CRUD ──────────────────────────────────────────────────────────────
+  async function addWorkout(form: WorkoutForm) {
+    const id = crypto.randomUUID()
+    await db.workout_templates.add({ id, name: form.name.trim(), dayOfWeek: form.dayOfWeek })
+    setShowAddWorkout(false)
+  }
+
+  async function updateWorkout(id: string, form: WorkoutForm) {
+    await db.workout_templates.update(id, { name: form.name.trim(), dayOfWeek: form.dayOfWeek })
+    setEditingWorkoutId(null)
+  }
+
+  async function deleteWorkout(id: string) {
+    // eenvoudige blokkade als er data aan hangt
+    const exCount = await db.exercises.where('templateId').equals(id).count()
+    const sessCount = await db.sessions.where('templateId').equals(id).count()
+    if (exCount > 0 || sessCount > 0) {
+      alert('Verwijderen is geblokkeerd omdat er al oefeningen/sessies aan hangen.')
+      return
+    }
+    if (!confirm('Workout verwijderen?')) return
+    await db.workout_templates.delete(id)
+  }
+
+  // ── UI ───────────────────────────────────────────────────────────────────────
   return (
     <div>
       <h1>Planner</h1>
@@ -118,83 +163,88 @@ export default function Planner() {
         )}
       </div>
 
-      <ul className="list">
-        {(templates ?? []).map(t => (
-          <li key={t.id} className="card">
+      {(templates ?? []).map(t => {
+        const tid = String(t.id)
+        const isEditingWorkout = editingWorkoutId === tid
+        const list = exercisesByTemplate.get(tid) ?? []
+
+        return (
+          <div key={tid} className="card">
             <div className="row">
-              <div><strong>{DAYS[t.dayOfWeek]}</strong> — {t.name}</div>
+              <div className="grow">
+                <strong>{DAYS[t.dayOfWeek]} · {t.name}</strong>
+              </div>
               <div className="actions">
-                <button onClick={() => startSession(t.id)}>Start</button>
-                <button onClick={() => setEditingWorkoutId(editingWorkoutId === t.id ? null : t.id)}>Bewerk</button>
-                <button onClick={() => deleteWorkout(t)}>Verwijder</button>
+                <button onClick={() => startSession(tid)}>Start sessie</button>
+                <button onClick={() => setAddingExerciseFor(tid)}>+ oefening</button>
+                {!isEditingWorkout ? (
+                  <>
+                    <button onClick={() => setEditingWorkoutId(tid)}>Bewerk</button>
+                    <button onClick={() => deleteWorkout(tid)}>Verwijder</button>
+                  </>
+                ) : null}
               </div>
             </div>
 
-            {editingWorkoutId === t.id && (
+            {/* Workout inline editor */}
+            {isEditingWorkout && (
               <WorkoutEditor
                 title="Bewerk workout"
                 initial={{ name: t.name, dayOfWeek: t.dayOfWeek }}
+                onSave={(form) => updateWorkout(tid, form)}
                 onCancel={() => setEditingWorkoutId(null)}
-                onSave={(form) => updateWorkout(t.id, form)}
               />
             )}
 
-            <div className="subhead">Oefeningen</div>
+            {/* Oefeningen in deze workout */}
             <ul className="sublist">
-              {(exercisesByTemplate.get(t.id) ?? []).sort((a,b)=>a.order-b.order).map(ex => (
-                <li key={ex.id} className="subrow">
-                  {editingExerciseId === ex.id ? (
-                    <ExerciseEditor
-                      initial={{
-                        name: ex.name,
-                        defaultSets: ex.defaultSets,
-                        defaultReps: ex.defaultReps,
-                        defaultWeight: ex.defaultWeight
-                      }}
-                      onCancel={() => setEditingExerciseId(null)}
-                      onSave={(form) => updateExercise(ex.id, form)}
-                    />
-                  ) : (
-                    <>
-                      <div className="grow">
-                        <strong>{ex.name}</strong>
-                        <div className="small">Sets {ex.defaultSets} • Reps {ex.defaultReps} • {ex.defaultWeight} kg</div>
-                      </div>
-                      <div className="actions">
-                        <button onClick={() => moveExercise(ex, -1)}>↑</button>
-                        <button onClick={() => moveExercise(ex, +1)}>↓</button>
-                        <button onClick={() => setEditingExerciseId(ex.id)}>Bewerk</button>
-                        <button onClick={() => deleteExercise(ex)}>Verwijder</button>
-                      </div>
-                    </>
-                  )}
-                </li>
-              ))}
+              {list.map(e => {
+                const eid = String(e.id)
+                const isEditingExercise = editingExerciseId === eid
+                return (
+                  <li key={eid} className="subrow">
+                    {!isEditingExercise ? (
+                      <>
+                        <div className="grow">
+                          <div><b>{e.name}</b></div>
+                          <div className="small">Sets {e.defaultSets} · Reps {e.defaultReps} · {e.defaultWeight} kg</div>
+                        </div>
+                        <div className="actions">
+                          <button onClick={() => moveExercise(eid, -1)}>↑</button>
+                          <button onClick={() => moveExercise(eid, +1)}>↓</button>
+                          <button onClick={() => setEditingExerciseId(eid)}>Bewerk</button>
+                          <button onClick={() => deleteExercise(eid)}>Verwijder</button>
+                        </div>
+                      </>
+                    ) : (
+                      <ExerciseEditor
+                        title="Bewerk oefening"
+                        initial={{ name: e.name, defaultSets: e.defaultSets ?? 0, defaultReps: e.defaultReps ?? 0, defaultWeight: e.defaultWeight ?? 0 }}
+                        onSave={(form) => updateExercise(eid, form)}
+                        onCancel={() => setEditingExerciseId(null)}
+                      />
+                    )}
+                  </li>
+                )
+              })}
             </ul>
 
-            {addingExerciseFor === t.id ? (
+            {/* Nieuwe oefening toevoegen */}
+            {addingExerciseFor === tid && (
               <ExerciseEditor
-                initial={{ name: '', defaultSets: 3, defaultReps: 10, defaultWeight: 0 }}
+                title="Nieuwe oefening"
+                initial={{ name: '', defaultSets: null, defaultReps: null, defaultWeight: null }}
+                onSave={(form) => addExercise(tid, form)}
                 onCancel={() => setAddingExerciseFor(null)}
-                onSave={(form) => addExercise(t.id, form)}
               />
-            ) : (
-              <div className="toolbar">
-                <button onClick={() => setAddingExerciseFor(t.id)}>+ Oefening toevoegen</button>
-              </div>
             )}
-          </li>
-        ))}
-      </ul>
-
-      <p className="small" style={{marginTop:16}}>
-        Seed templates zijn toegevoegd voor een snelle start. Je kunt alles hier bewerken of verwijderen. Verwijderen is geblokkeerd als er al data aan hangt.
-      </p>
+          </div>
+        )
+      })}
     </div>
   )
 }
 
-// ── Kleine inline editors ───────────────────────────────────────────────────────
 function WorkoutEditor(props: {
   title: string
   initial: WorkoutForm
@@ -213,7 +263,13 @@ function WorkoutEditor(props: {
         <label className="field">
           <span>Dag</span>
           <select value={form.dayOfWeek} onChange={e=>setForm({...form, dayOfWeek: Number(e.target.value)})}>
-            {[1,2,3,4,5,6,7].map(n => <option key={n} value={n}>{DAYS[n]}</option>)}
+            <option value={1}>Maandag</option>
+            <option value={2}>Dinsdag</option>
+            <option value={3}>Woensdag</option>
+            <option value={4}>Donderdag</option>
+            <option value={5}>Vrijdag</option>
+            <option value={6}>Zaterdag</option>
+            <option value={7}>Zondag</option>
           </select>
         </label>
       </div>
@@ -226,29 +282,43 @@ function WorkoutEditor(props: {
 }
 
 function ExerciseEditor(props: {
+  title: string
   initial: ExerciseForm
   onSave: (form: ExerciseForm) => void
   onCancel: () => void
 }) {
   const [form, setForm] = useState<ExerciseForm>(props.initial)
   return (
-    <div className="editbox">
-      <div className="editbox-body grid">
+    <div className="editbox" style={{width:'100%'}}>
+      <div className="editbox-head">{props.title}</div>
+      <div className="editbox-body" style={{display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr', gap:12}}>
         <label className="field">
           <span>Naam</span>
           <input value={form.name} onChange={e=>setForm({...form, name: e.target.value})} placeholder="Bijv. Bench Press" />
         </label>
         <label className="field">
           <span>Sets</span>
-          <input type="number" min={1} max={10} value={form.defaultSets} onChange={e=>setForm({...form, defaultSets: Number(e.target.value)})}/>
+          <input
+            type="number" min={1} max={10}
+            value={toInputValue(form.defaultSets)}
+            onChange={e=>setForm({...form, defaultSets: fromInputValue(e.target.value)})}
+          />
         </label>
         <label className="field">
           <span>Reps</span>
-          <input type="number" min={1} max={50} value={form.defaultReps} onChange={e=>setForm({...form, defaultReps: Number(e.target.value)})}/>
+          <input
+            type="number" min={1} max={50}
+            value={toInputValue(form.defaultReps)}
+            onChange={e=>setForm({...form, defaultReps: fromInputValue(e.target.value)})}
+          />
         </label>
         <label className="field">
           <span>Gewicht (kg)</span>
-          <input type="number" min={0} max={500} step={2.5} value={form.defaultWeight} onChange={e=>setForm({...form, defaultWeight: Number(e.target.value)})}/>
+          <input
+            type="number" min={0} max={500} step={2.5}
+            value={toInputValue(form.defaultWeight)}
+            onChange={e=>setForm({...form, defaultWeight: fromInputValue(e.target.value)})}
+          />
         </label>
       </div>
       <div className="editbox-actions">
